@@ -1,43 +1,65 @@
 package com.github.fma1
 
 import com.danielasfregola.twitter4s.TwitterRestClient
-import com.danielasfregola.twitter4s.entities.{RatedData, UserIds}
+import com.danielasfregola.twitter4s.entities.{RatedData, Tweet, User, UserIds, Users}
+import com.typesafe.config.ConfigFactory
+import slick.jdbc.PostgresProfile.api._
 
-import scala.concurrent.ExecutionContext
-import scala.util.{Failure, Success}
+import org.slf4j.{Logger, LoggerFactory}
+
+import scala.annotation.tailrec
+import scala.collection.mutable.ArrayBuffer
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, ExecutionContext, Future}
+
+class Utils {}
 
 object Utils {
-  def printFriendsForUser(username: String, restClient: TwitterRestClient)(implicit executor: ExecutionContext): Unit = {
-    restClient.friendIdsForUser(username) onComplete {
-      case Success(value) =>
-        value match {
-          case RatedData(rate_limit, data) =>
-            val userIds = data
-            println(s"Rate limit: $rate_limit")
-            userIds match {
-              case UserIds(ids, next_cursor, previous_cursor) =>
-                println(s"next_cursor: $next_cursor")
-                println(s"previous_cursor: $previous_cursor")
-                println("ids: ")
-                println(ids.mkString(","))
-            }
+  val logger: Logger = LoggerFactory.getLogger(classOf[Utils])
+
+  def getMutualsForUserId(userId: Long, restClient: TwitterRestClient)(implicit executor: ExecutionContext): ArrayBuffer[User] = {
+    val mutuals = new ArrayBuffer[User]()
+
+    @tailrec
+    def mutualsHelper(cursor: Long = -1L): Unit = {
+      if (cursor != 0) {
+        val users = Await.result(restClient.friendsForUserId(user_id = userId, count = 200).map(_.data), Duration.Inf)
+        users match {
+          case Users(users, next_cursor, _) =>
+            mutuals.addAll(users.filter(_.following))
+            mutualsHelper(next_cursor)
         }
-      case Failure(exception) =>
-        System.err.println(s"Exception: $exception")
+      }
     }
+
+    mutualsHelper()
+    mutuals
   }
 
-  def printRecentTweetsForUserId(userId: Long, restClient: TwitterRestClient)(implicit executor: ExecutionContext): Unit = {
-    restClient.userTimelineForUserId(user_id = userId, count = 5, exclude_replies = false) onComplete {
-      case Success(value) =>
-        value match {
-          case RatedData(rate_limit, data) =>
-            System.err.println(rate_limit)
-            val tweets = data
-            tweets.foreach(tweet => println(s"\n\n$tweet\n\n"))
-        }
-      case Failure(exception) =>
-        System.err.println(s"Exception: $exception")
-    }
+  def getRecentTweetsForUserId(userId: Long, restClient: TwitterRestClient)(implicit executor: ExecutionContext): Future[Seq[Tweet]] = {
+    restClient.userTimelineForUserId(user_id = userId, count = 30, exclude_replies = false).map(_.data)
+  }
+
+  def db = {
+    val config = ConfigFactory.load("application")
+    val url = config.getString("db.url")
+    val username = config.getString("db.username")
+    val password = config.getString("db.password")
+    val driver = config.getString("db.driver")
+
+    Database.forURL(url, username, password, null, driver)
+
+
+    /*
+    try {
+      val action = DBIO.seq(
+        users += (99986, "name 2", "screen name 2")
+      )
+
+      val future = db.run(action)
+      Await.result(future, Duration.Inf)
+    } finally db.close
+
+     */
   }
 }
