@@ -4,9 +4,9 @@ import com.danielasfregola.twitter4s.TwitterRestClient
 import com.danielasfregola.twitter4s.entities.{RatedData, Tweet, User, UserIds, Users}
 import com.typesafe.config.ConfigFactory
 import slick.jdbc.PostgresProfile.api._
-
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.sql.Timestamp
 import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration.Duration
@@ -15,6 +15,8 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 class Utils {}
 
 object Utils {
+  type TweetTuple = (Long, Timestamp, String, Long, String, Long, String, String, Boolean, String, Long, Int, Long, Boolean, String, String)
+
   val logger: Logger = LoggerFactory.getLogger(classOf[Utils])
 
   def getMutualsForUserId(userId: Long, restClient: TwitterRestClient)(implicit executor: ExecutionContext): ArrayBuffer[User] = {
@@ -40,7 +42,7 @@ object Utils {
     restClient.userTimelineForUserId(user_id = userId, count = 30, exclude_replies = false).map(_.data)
   }
 
-  def db = {
+  def getDB = {
     val config = ConfigFactory.load("application")
     val url = config.getString("db.url")
     val username = config.getString("db.username")
