@@ -9,6 +9,7 @@ import java.sql.Timestamp
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.util.{Failure, Success}
 
 object MainApp extends App {
   val consumerToken: ConsumerToken = _
@@ -30,7 +31,6 @@ object MainApp extends App {
   val usersTable = TableQuery[UsersTable]
 
   class TweetsTable(tag: Tag) extends Table[TweetTuple](tag, "users") {
-    // TODO: Add method to convert tweet to tuple
     def id = column[Long]("id", O.PrimaryKey) // This is the primary key column
     def created_at = column[Timestamp]("created_at")
     def id_str = column[String]("id_str")
@@ -50,29 +50,27 @@ object MainApp extends App {
     def source = column[String]("source")
     def text = column[String]("text")
 
-    def * = (id, created_at, id_str, in_reply_to_status_id, in_reply_to_status_id_str, in_reply_to_user_id, in_reply_to_user_id_str, in_reply_to_screen_name, is_quote_status, quoted_status_id, quoted_status_id_str, user_id, favorite_count, retweet_count, retweeted, source, text)
+    def * = (id, created_at, id_str, in_reply_to_status_id.?, in_reply_to_status_id_str.?, in_reply_to_user_id.?, in_reply_to_user_id_str.?, in_reply_to_screen_name.?, is_quote_status, quoted_status_id.?, quoted_status_id_str.?, user_id.?, favorite_count, retweet_count, retweeted, source, text)
   }
   val tweetsTable = TableQuery[TweetsTable]
 
   val users = getMutualsForUserId(userId, restClient)
-  val arrayBufOfFutures: ArrayBuffer[Future[Seq[Tweet]]] = users.map(mutual =>
-    getRecentTweetsForUserId(mutual.id, restClient))
-  val futureOfArrayBuf: Future[ArrayBuffer[Seq[Tweet]]] = Future.sequence(arrayBufOfFutures)
+  val arrayBufOfFutures: ArrayBuffer[Future[Seq[Tweet]]] =
+    users.map(mutual => getRecentTweetsForUserId(mutual.id, restClient))
+  val futureOfArrayBuf: Future[ArrayBuffer[Seq[Tweet]]] =
+    Future.sequence(arrayBufOfFutures)
 
   val dbFutures = ArrayBuffer[Future[Unit]]()
 
   try {
-    // TODO: Add users first, then add tweets
-    futureOfArrayBuf
-      .foreach(arrayBuf =>
-        arrayBuf.foreach(seqTweet =>
-          seqTweet.foreach(tweet => {
-            val action = DBIO.seq(
-              // TODO: Add method to convert Tweets and Users into tuples
-              // users += (99986, "name 2", "screen name 2")
-            )
-            dbFutures.addOne(db.run(action))
-          })))
+    futureOfArrayBuf onComplete {
+      case Success(tweets) =>
+        logger.info("Success.")
+        usersTable ++= users.map(_.toUserTuple)
+        tweetsTable ++= tweets.flatten.map(_.toTweetTuple)
+      case Failure(exception) =>
+        logger.error("Error getting tweets", exception)
+    }
   } finally db.close
 
 

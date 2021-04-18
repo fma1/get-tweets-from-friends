@@ -16,17 +16,21 @@ import scala.language.implicitConversions
 class Utils {}
 
 object Utils {
-  type TweetTuple = (Long, Timestamp, String, Long, String, Long, String, String, Boolean, Long, String, Long, Int, Long, Boolean, String, String)
+  type UserTuple = (Long, String, String)
+  type TweetTuple = (Long, Timestamp, String, Option[Long], Option[String], Option[Long], Option[String], Option[String], Boolean, Option[Long], Option[String], Option[Long], Int, Long, Boolean, String, String)
 
   val logger: Logger = LoggerFactory.getLogger(classOf[Utils])
 
   def getMutualsForUserId(userId: Long, restClient: TwitterRestClient)(implicit executor: ExecutionContext): ArrayBuffer[User] = {
+    logger.info("Hello")
+    System.err.println("getMutualsForUserId")
     val mutuals = new ArrayBuffer[User]()
 
     @tailrec
     def mutualsHelper(cursor: Long = -1L): Unit = {
+      System.err.println("cursor: " + cursor)
       if (cursor != 0) {
-        val users = Await.result(restClient.friendsForUserId(user_id = userId, count = 200).map(_.data), Duration.Inf)
+        val users = Await.result(restClient.friendsForUserId(user_id = userId, count = 5).map(_.data), Duration.Inf)
         users match {
           case Users(users, next_cursor, _) =>
             mutuals.addAll(users.filter(_.following))
@@ -40,7 +44,8 @@ object Utils {
   }
 
   def getRecentTweetsForUserId(userId: Long, restClient: TwitterRestClient)(implicit executor: ExecutionContext): Future[Seq[Tweet]] = {
-    restClient.userTimelineForUserId(user_id = userId, count = 30, exclude_replies = false).map(_.data)
+    System.err.println("getRecentTweetsForUserId: " + userId)
+    restClient.userTimelineForUserId(user_id = userId, count = 10, exclude_replies = false).map(_.data)
   }
 
   def getDB = {
@@ -53,54 +58,62 @@ object Utils {
     Database.forURL(url, username, password, null, driver)
   }
 
-  implicit def toTweetTuple(tweet: Tweet): TweetTuple = {
-    tweet match {
-      case Tweet(
-      _, _,
-      created_at,
-      _, _, _, _,
-      favorite_count,
-      _, _, _,
-      id,
-      id_str,
-      in_reply_to_screen_name,
-      in_reply_to_status_id,
-      in_reply_to_status_id_str,
-      in_reply_to_user_id,
-      in_reply_to_user_id_str,
-      is_quote_status,
-      _, _, _,
-      quoted_status_id,
-      quoted_status_id_str,
-      _, _,
-      retweet_count,
-      retweeted,
-      _,
-      source,
-      text,
-      _, _,
-      user,
-      _, _, _, _
-      ) =>
-        (
-          id,
-          Timestamp.from(created_at),
-          id_str,
-          in_reply_to_status_id.orNull.asInstanceOf[Long],
-          in_reply_to_status_id_str.orNull,
-          in_reply_to_user_id.orNull.asInstanceOf[Long],
-          in_reply_to_user_id_str.orNull,
-          in_reply_to_screen_name.orNull,
-          is_quote_status,
-          quoted_status_id.orNull.asInstanceOf[Long],
-          quoted_status_id_str.orNull,
-          user.map(_.id).orNull.asInstanceOf[Long],
-          favorite_count,
-          retweet_count,
-          retweeted,
-          source,
-          text
-        )
+  implicit class UserImprovement(val user: User) {
+    def toUserTuple: UserTuple = {
+      (user.id, user.name, user.screen_name)
+    }
+  }
+
+  implicit class TweetImprovement(val tweet: Tweet) {
+    def toTweetTuple: TweetTuple = {
+      tweet match {
+        case Tweet(
+        _, _,
+        created_at,
+        _, _, _, _,
+        favorite_count,
+        _, _, _,
+        id,
+        id_str,
+        in_reply_to_screen_name,
+        in_reply_to_status_id,
+        in_reply_to_status_id_str,
+        in_reply_to_user_id,
+        in_reply_to_user_id_str,
+        is_quote_status,
+        _, _, _,
+        quoted_status_id,
+        quoted_status_id_str,
+        _, _,
+        retweet_count,
+        retweeted,
+        _,
+        source,
+        text,
+        _, _,
+        user,
+        _, _, _, _
+        ) =>
+          (
+            id,
+            Timestamp.from(created_at),
+            id_str,
+            in_reply_to_status_id,
+            in_reply_to_status_id_str,
+            in_reply_to_user_id,
+            in_reply_to_user_id_str,
+            in_reply_to_screen_name,
+            is_quote_status,
+            quoted_status_id,
+            quoted_status_id_str,
+            user.map(_.id),
+            favorite_count,
+            retweet_count,
+            retweeted,
+            source,
+            text
+          )
+      }
     }
   }
 }
