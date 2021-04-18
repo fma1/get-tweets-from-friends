@@ -11,11 +11,12 @@ import scala.annotation.tailrec
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.language.implicitConversions
 
 class Utils {}
 
 object Utils {
-  type TweetTuple = (Long, Timestamp, String, Long, String, Long, String, String, Boolean, String, Long, Int, Long, Boolean, String, String)
+  type TweetTuple = (Long, Timestamp, String, Long, String, Long, String, String, Boolean, Long, String, Long, Int, Long, Boolean, String, String)
 
   val logger: Logger = LoggerFactory.getLogger(classOf[Utils])
 
@@ -50,18 +51,56 @@ object Utils {
     val driver = config.getString("db.driver")
 
     Database.forURL(url, username, password, null, driver)
+  }
 
-
-    /*
-    try {
-      val action = DBIO.seq(
-        users += (99986, "name 2", "screen name 2")
-      )
-
-      val future = db.run(action)
-      Await.result(future, Duration.Inf)
-    } finally db.close
-
-     */
+  implicit def toTweetTuple(tweet: Tweet): TweetTuple = {
+    tweet match {
+      case Tweet(
+      _, _,
+      created_at,
+      _, _, _, _,
+      favorite_count,
+      _, _, _,
+      id,
+      id_str,
+      in_reply_to_screen_name,
+      in_reply_to_status_id,
+      in_reply_to_status_id_str,
+      in_reply_to_user_id,
+      in_reply_to_user_id_str,
+      is_quote_status,
+      _, _, _,
+      quoted_status_id,
+      quoted_status_id_str,
+      _, _,
+      retweet_count,
+      retweeted,
+      _,
+      source,
+      text,
+      _, _,
+      user,
+      _, _, _, _
+      ) =>
+        (
+          id,
+          Timestamp.from(created_at),
+          id_str,
+          in_reply_to_status_id.orNull.asInstanceOf[Long],
+          in_reply_to_status_id_str.orNull,
+          in_reply_to_user_id.orNull.asInstanceOf[Long],
+          in_reply_to_user_id_str.orNull,
+          in_reply_to_screen_name.orNull,
+          is_quote_status,
+          quoted_status_id.orNull.asInstanceOf[Long],
+          quoted_status_id_str.orNull,
+          user.map(_.id).orNull.asInstanceOf[Long],
+          favorite_count,
+          retweet_count,
+          retweeted,
+          source,
+          text
+        )
+    }
   }
 }

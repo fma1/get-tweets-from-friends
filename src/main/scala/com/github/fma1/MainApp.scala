@@ -40,7 +40,8 @@ object MainApp extends App {
     def in_reply_to_user_id_str = column[String]("in_reply_to_user_id_str")
     def in_reply_to_screen_name = column[String]("in_reply_to_screen_name")
     def is_quote_status = column[Boolean]("is_quote_status")
-    def is_quote_status_str = column[String]("is_quote_status_str")
+    def quoted_status_id = column[Long]("quoted_status_id")
+    def quoted_status_id_str = column[String]("quoted_status_id_str")
     def user_id = column[Long]("user_id")
     def user = foreignKey("tweets_users_fk", user_id, usersTable)(_.id)
     def favorite_count = column[Int]("favorite_count")
@@ -49,7 +50,7 @@ object MainApp extends App {
     def source = column[String]("source")
     def text = column[String]("text")
 
-    def * = (id, created_at, id_str, in_reply_to_status_id, in_reply_to_status_id_str, in_reply_to_user_id, in_reply_to_user_id_str, in_reply_to_screen_name, is_quote_status, is_quote_status_str, user_id, favorite_count, retweet_count, retweeted, source, text)
+    def * = (id, created_at, id_str, in_reply_to_status_id, in_reply_to_status_id_str, in_reply_to_user_id, in_reply_to_user_id_str, in_reply_to_screen_name, is_quote_status, quoted_status_id, quoted_status_id_str, user_id, favorite_count, retweet_count, retweeted, source, text)
   }
   val tweetsTable = TableQuery[TweetsTable]
 
